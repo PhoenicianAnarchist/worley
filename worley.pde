@@ -1,10 +1,14 @@
 PVector[] points_vec;
-float[][] distances;
+float[][] distances_r;
+float[][] distances_g;
+float[][] distances_b;
 
 int cell_size;
 int point_count;
 int order;
-Grid grid;
+Grid grid_r;
+Grid grid_g;
+Grid grid_b;
 
 void setup() {
   cell_size = 64;
@@ -12,8 +16,12 @@ void setup() {
   order = 1;
 
   size(512, 512);
-  grid = new Grid(width, height, cell_size, point_count);
-  distances = grid.calcDistances(4);
+  grid_r = new Grid(width, height, cell_size, point_count);
+  distances_r = grid_r.calcDistances(4);
+  grid_g = new Grid(width, height, cell_size, point_count);
+  distances_g = grid_g.calcDistances(4);
+  grid_b = new Grid(width, height, cell_size, point_count);
+  distances_b = grid_b.calcDistances(4);
 }
 
 void draw() {
@@ -22,8 +30,11 @@ void draw() {
     for (int x = 0; x < width; ++x) {
       int index = (y * width) + x;
 
-      float c = distances[index][order - 1];
-      pixels[index] = color(map(c, 0, cell_size * order, 0, 255));
+      float r = map(distances_r[index][order - 1], 0, cell_size * order, 0, 127);
+      float g = map(distances_g[index][order - 1], 0, cell_size * order, 0, 127);
+      float b = map(distances_b[index][order - 1], 0, cell_size * order, 0, 255);
+
+      pixels[index] = color(r, g, b);
     }
   }
   updatePixels();
