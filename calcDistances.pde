@@ -1,4 +1,4 @@
-float[] calcDistances(int w, int h, PVector[] points) {
+float[] calcDistances(int w, int h, Point[] points) {
   int pixel_count = w * h;
   float[] distances = new float[pixel_count];
 
@@ -8,7 +8,7 @@ float[] calcDistances(int w, int h, PVector[] points) {
 
       float[] tmp_dist = new float[points.length];
       for (int i = 0; i < points.length; ++i) {
-        PVector p = points[i];
+        Point p = points[i];
         float d = dist(x, y, p.x, p.y);
         tmp_dist[i] = d;
       }
