@@ -7,4 +7,4 @@ A basic Worley Noise algorithm is as follows:-
 - a point is generated within each cell
 - for each pixel, the distance to the closest point is calculated
 
-![Worley F1](screenshot.png)
+![Worley F1](preview.png)
