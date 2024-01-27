@@ -16,7 +16,8 @@ class Cell {
     for (int i = 0; i < count; ++i) {
       PVector p = new PVector(
         random(cell_size) + (position.x * cell_size),
-        random(cell_size) + (position.y * cell_size)
+        random(cell_size) + (position.y * cell_size),
+        random(cell_size) + (position.z * cell_size)
       );
 
       points.add(new Point(p));
@@ -42,21 +43,27 @@ class Grid {
     this.cell_size = cell_size;
     this.num_cells = new PVector(
       int(this.dimensions.x / this.cell_size),
-      int(this.dimensions.y / this.cell_size)
+      int(this.dimensions.y / this.cell_size),
+      int(this.dimensions.z / this.cell_size)
     );
 
-    int cell_count = int(this.num_cells.x * this.num_cells.y);
-    println("Generating " + cell_count + " cells. " + this.num_cells.x + " x " + this.num_cells.y);
+    int cell_count = int(this.num_cells.x * this.num_cells.y * this.num_cells.z);
+    println("Generating " + cell_count + " cells. " + this.num_cells.x + " x " + this.num_cells.y + " x " + this.num_cells.z);
     cells = new Cell[cell_count];
 
-    for (int cell_y = 0; cell_y < this.num_cells.y; ++cell_y) {
-      int row_offset = int(cell_y * num_cells.x);
+    int layer_cell_count = int(this.num_cells.x * this.num_cells.y);
+    for (int cell_z = 0; cell_z < this.num_cells.z; ++cell_z) {
+      int layer_offset = cell_z * layer_cell_count;
 
-      for (int cell_x = 0; cell_x < this.num_cells.x; ++cell_x) {
-        int cell_index = row_offset + cell_x;
+      for (int cell_y = 0; cell_y < this.num_cells.y; ++cell_y) {
+        int row_offset = cell_y * int(this.num_cells.x);
 
-        PVector p = new PVector(cell_x, cell_y);
-        cells[cell_index] = new Cell(p, cell_size, point_count);
+        for (int cell_x = 0; cell_x < this.num_cells.x; ++cell_x) {
+          int cell_index = layer_offset + row_offset + cell_x;
+
+          PVector p = new PVector(cell_x, cell_y, cell_z);
+          cells[cell_index] = new Cell(p, cell_size, point_count);
+        }
       }
     }
   }
@@ -66,10 +73,10 @@ class Grid {
 
     switch (f) {
       case EUCLID:
-        d = dist(a.x, a.y, b.x, b.y);
+        d = dist(a.x, a.y, a.z, b.x, b.y, b.z);
         break;
       case TAXI:
-        d = abs(a.x - b.x) + abs(a.y - b.y);
+        d = abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z);
         break;
       case STAR:
         d = distance(a, b, DistFunc.EUCLID);
@@ -80,7 +87,7 @@ class Grid {
         }
         break;
       case MAX:
-        d = max(abs(a.x - b.x), abs(a.y - b.y));
+        d = max(abs(a.x - b.x), abs(a.y - b.y), abs(a.z - b.z));
         break;
       case MEAN:
         float taxi = distance(a, b, DistFunc.TAXI);
@@ -93,29 +100,34 @@ class Grid {
   }
 
   float[][] calcDistances(int order, DistFunc df) {
-    int pixel_count = int(this.dimensions.x * this.dimensions.y);
+    int pixel_count = int(this.dimensions.x * this.dimensions.y * this.dimensions.z);
     float[][] distances = new float[pixel_count][order];
 
-    for (int y = 0; y < this.dimensions.y; ++y) {
-      int row_offset  = int(y * this.dimensions.x);
+    int layer_cell_count = int(this.dimensions.x * this.dimensions.y);
 
-      for (int x = 0; x < this.dimensions.x; ++x) {
-        int cell_index = row_offset + x;
+    for (int z = 0; z < this.dimensions.z; ++z) {
+      int layer_offset = z * layer_cell_count;
 
-        ArrayList<Point> points = this.getPoints(x, y);
+      for (int y = 0; y < this.dimensions.y; ++y) {
+        int row_offset  = y * int(this.dimensions.x);
 
-        float[] tmp_dist = new float[points.size()];
-        for (int i = 0; i < points.size(); ++i) {
-          Point p = points.get(i);
-          float d = distance(new PVector(x, y), p.position, df);
-          tmp_dist[i] = d;
-        }
+        for (int x = 0; x < this.dimensions.x; ++x) {
+          int cell_index = layer_offset + row_offset + x;
 
-        float[] sorted = sort(tmp_dist);
-        distances[cell_index] = new float[order];
-        for (int i = 0; i < order; ++i) {
-          float f = sorted[i];
-          distances[cell_index][i] = f;
+          ArrayList<Point> points = this.getPoints(new PVector(x, y, z));
+
+          float[] tmp_dist = new float[points.size()];
+          for (int i = 0; i < points.size(); ++i) {
+            Point p = points.get(i);
+            float d = distance(new PVector(x, y, z), p.position, df);
+            tmp_dist[i] = d;
+          }
+
+          float[] sorted = sort(tmp_dist);
+          for (int i = 0; i < order; ++i) {
+            float f = sorted[i];
+            distances[cell_index][i] = f;
+          }
         }
       }
     }
@@ -126,26 +138,35 @@ class Grid {
   ArrayList<Integer> getIndices(PVector pos, PVector bounds) {
     ArrayList<Integer> indices = new ArrayList<Integer>();
 
+    int lower   = (pos.z == 0)              ? 0 : -1;
+    int upper   = (pos.z == (bounds.z - 1)) ? 0 :  1;
     int top     = (pos.y == 0)              ? 0 : -1;
     int bottom  = (pos.y == (bounds.y - 1)) ? 0 :  1;
     int left    = (pos.x == 0)              ? 0 : -1;
     int right   = (pos.x == (bounds.x - 1)) ? 0 :  1;
 
-    for (int i = top; i <= bottom; ++i) {
-      int row_offset = int((pos.y + i) * bounds.x);
+    int layer_cell_count = int(bounds.x * bounds.y);
 
-      for (int j = left; j <= right; ++j) {
-        indices.add(row_offset + int(pos.x + j));
+    for (int k = lower; k <= upper; ++k) {
+      int layer_offset = (int(pos.z) + k) * layer_cell_count;
+
+      for (int j = top; j <= bottom; ++j) {
+        int row_offset = (int(pos.y) + j) * int(bounds.x);
+
+        for (int i = left; i <= right; ++i) {
+          indices.add(layer_offset + row_offset + int(pos.x + i));
+        }
       }
     }
 
     return indices;
   }
 
-  ArrayList<Cell> getCells(int x, int y) {
+  ArrayList<Cell> getCells(PVector pos) {
     PVector cell_pos = new PVector(
-      int(x / this.cell_size),
-      int(y / this.cell_size)
+      int(pos.x / this.cell_size),
+      int(pos.y / this.cell_size),
+      int(pos.z / this.cell_size)
     );
 
     ArrayList<Integer> indices = getIndices(cell_pos, this.num_cells);
@@ -158,8 +179,8 @@ class Grid {
     return neighbours;
   }
 
-  ArrayList<Point> getPoints(int x, int y) {
-    ArrayList<Cell> neighbours = this.getCells(x, y);
+  ArrayList<Point> getPoints(PVector pos) {
+    ArrayList<Cell> neighbours = this.getCells(pos);
     ArrayList<Point> points = new ArrayList<Point>();
 
     for (int i = 0; i < neighbours.size(); ++i) {
