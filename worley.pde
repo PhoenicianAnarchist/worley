@@ -13,10 +13,11 @@ void setup() {
   order = 1;
 
   size(512, 512);
-  grid = new Grid(width, height, cell_size, point_count);
+  PVector ws = new PVector(width, height);
+  grid = new Grid(ws, cell_size, point_count);
 
   float start = millis();
-  distances = grid.calcDistances(4, DistFunc.MEAN);
+  distances = grid.calcDistances(4, DistFunc.EUCLID);
   float end = millis();
   float elapsed = end - start;
   println("Processed in " + elapsed + " milliseconds.");
