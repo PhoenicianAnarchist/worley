@@ -123,56 +123,36 @@ class Grid {
     return distances;
   }
 
+  ArrayList<Integer> getIndices(PVector pos, PVector bounds) {
+    ArrayList<Integer> indices = new ArrayList<Integer>();
+
+    int top     = (pos.y == 0)              ? 0 : -1;
+    int bottom  = (pos.y == (bounds.y - 1)) ? 0 :  1;
+    int left    = (pos.x == 0)              ? 0 : -1;
+    int right   = (pos.x == (bounds.x - 1)) ? 0 :  1;
+
+    for (int i = top; i <= bottom; ++i) {
+      int row_offset = int((pos.y + i) * bounds.x);
+
+      for (int j = left; j <= right; ++j) {
+        indices.add(row_offset + int(pos.x + j));
+      }
+    }
+
+    return indices;
+  }
+
   ArrayList<Cell> getCells(int x, int y) {
-    int cell_x = int(x / this.cell_size);
-    int cell_y = int(y / this.cell_size);
+    PVector cell_pos = new PVector(
+      int(x / this.cell_size),
+      int(y / this.cell_size)
+    );
+
+    ArrayList<Integer> indices = getIndices(cell_pos, this.num_cells);
 
     ArrayList<Cell> neighbours = new ArrayList<Cell>();
-
-    int index;
-    index = int(cell_y * this.num_cells.x) + cell_x;
-    neighbours.add(this.cells[index]);
-
-    boolean is_top = (cell_y == 0);
-    boolean is_bottom = (cell_y == (this.num_cells.y - 1));
-    boolean is_left = (cell_x == 0);
-    boolean is_right = (cell_x == (num_cells.x - 1));
-
-    if (!is_top) {
-      index = ((cell_y - 1) * int(this.num_cells.x)) + (cell_x);
-      neighbours.add(this.cells[index]);
-
-      if (!is_left) {
-        index = ((cell_y - 1) * int(this.num_cells.x)) + (cell_x - 1);
-        neighbours.add(this.cells[index]);
-      }
-      if (!is_right) {
-        index = ((cell_y - 1) * int(this.num_cells.x)) + (cell_x + 1);
-        neighbours.add(this.cells[index]);
-      }
-    }
-
-    if (!is_left) {
-      index = ((cell_y) * int(this.num_cells.x)) + (cell_x - 1);
-      neighbours.add(this.cells[index]);
-    }
-    if (!is_right) {
-      index = ((cell_y) * int(this.num_cells.x)) + (cell_x + 1);
-      neighbours.add(this.cells[index]);
-    }
-
-    if (!is_bottom) {
-      index = ((cell_y + 1) * int(this.num_cells.x)) + (cell_x);
-      neighbours.add(this.cells[index]);
-
-      if (!is_left) {
-        index = ((cell_y + 1) * int(this.num_cells.x)) + (cell_x - 1);
-        neighbours.add(this.cells[index]);
-      }
-      if (!is_right) {
-        index = ((cell_y + 1) * int(this.num_cells.x)) + (cell_x + 1);
-        neighbours.add(this.cells[index]);
-      }
+    for (int i : indices) {
+      neighbours.add(this.cells[i]);
     }
 
     return neighbours;
