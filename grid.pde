@@ -31,6 +31,14 @@ class Cell {
   ArrayList<Point> points;
 }
 
+enum DistFunc {
+  EUCLID,
+  TAXI,
+  STAR,
+  MAX,
+  MEAN
+}
+
 class Grid {
   Grid(int w, int h, int cell_size, int point_count) {
     this.w = w;
@@ -51,7 +59,38 @@ class Grid {
     }
   }
 
-  float[][] calcDistances(int order) {
+  float distance(float ax, float ay, float bx, float by, DistFunc f) {
+    float d = 0;
+
+    switch (f) {
+      case EUCLID:
+        d = dist(ax, ay, bx, by);
+        break;
+      case TAXI:
+        d = abs(ax - bx) + abs(ay - by);
+        break;
+      case STAR:
+        d = distance(ax, ay, bx, by, DistFunc.EUCLID);
+        if (int(d) % 2 == 0) {
+          d /= 2;
+        } else {
+          d *= 2;
+        }
+        break;
+      case MAX:
+        d = max(abs(ax - bx), abs(ay - by));
+        break;
+      case MEAN:
+        float taxi = distance(ax, ay, bx, by, DistFunc.TAXI);
+        float max = distance(ax, ay, bx, by, DistFunc.MAX);
+        d = (taxi + max) / 2;
+        break;
+    }
+
+    return d;
+  }
+
+  float[][] calcDistances(int order, DistFunc df) {
     int pixel_count = this.w * this.h;
     float[][] distances = new float[pixel_count][order];
 
@@ -64,7 +103,7 @@ class Grid {
         float[] tmp_dist = new float[points.size()];
         for (int i = 0; i < points.size(); ++i) {
           Point p = points.get(i);
-          float d = dist(x, y, p.x, p.y);
+          float d = distance(x, y, p.x, p.y, df);
           tmp_dist[i] = d;
         }
 

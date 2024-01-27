@@ -7,13 +7,19 @@ int order;
 Grid grid;
 
 void setup() {
+  randomSeed(0);
   cell_size = 64;
   point_count = 1;
   order = 1;
 
   size(512, 512);
   grid = new Grid(width, height, cell_size, point_count);
-  distances = grid.calcDistances(4);
+
+  float start = millis();
+  distances = grid.calcDistances(4, DistFunc.MEAN);
+  float end = millis();
+  float elapsed = end - start;
+  println("Processed in " + elapsed + " milliseconds.");
 }
 
 void draw() {
