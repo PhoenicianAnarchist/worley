@@ -1,29 +1,50 @@
 PVector[] points_vec;
 float[][] distances;
 
+PVector cell_counts;
 int cell_size;
 int point_count;
 int order;
+int depth;
 Grid grid;
 
 void setup() {
-  cell_size = 64;
+  randomSeed(0);
+  size(64, 64);
+
+  cell_counts = new PVector(8, 8, 8);
+  cell_size = 16;
   point_count = 1;
   order = 1;
 
-  size(512, 512);
-  grid = new Grid(width, height, cell_size, point_count);
-  distances = grid.calcDistances(4);
+  int w = int(cell_counts.x) * cell_size;
+  int h = int(cell_counts.y) * cell_size;
+  depth = int(cell_counts.z) * cell_size;
+
+  windowResize(w, h);
+  PVector ws = new PVector(width, height, depth);
+  grid = new Grid(ws, cell_size, point_count);
+
+  float start = millis();
+  distances = grid.calcDistances(2, DistFunc.EUCLID);
+  float end = millis();
+  float elapsed = end - start;
+  println("Processed in " + elapsed + " milliseconds.");
 }
 
 void draw() {
   loadPixels();
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      int index = (y * width) + x;
+  int slice_pixel_count = width * height;
 
-      float c = distances[index][order - 1];
-      pixels[index] = color(map(c, 0, cell_size * order, 0, 255));
+  for (int y = 0; y < height; ++y) {
+    int row_offset = (y * width);
+    for (int x = 0; x < width; ++x) {
+      int pixel_index = row_offset + x;
+      int slice_index = (int(frameCount / 4) % depth) * slice_pixel_count;
+
+      float c = distances[slice_index + pixel_index][order - 1];
+
+      pixels[pixel_index] = color(map(c, 0, cell_size * order * 1.4, 0, 255));
     }
   }
   updatePixels();
@@ -52,9 +73,5 @@ void keyPressed() {
     order = 1;
   } else if (key == '2') {
     order = 2;
-  } else if (key == '3') {
-    order = 3;
-  } else if (key == '4') {
-    order = 4;
   }
 }

@@ -1,78 +1,133 @@
 class Point {
-  Point(float x, float y) {
-    this.x = x;
-    this.y = y;
+  Point(PVector p) {
+    this.position = p;
+    this.weight = 1.0;
   }
 
-  float x;
-  float y;
+  PVector position;
+  float weight;
 }
 
 class Cell {
-  Cell(int x, int y, int cell_size, int count) {
-    this.x = x;
-    this.y = y;
-
-    float point_x;
-    float point_y;
+  Cell(PVector position, int cell_size, int count) {
+    this.position = position;
 
     points = new ArrayList<Point>();
-
     for (int i = 0; i < count; ++i) {
-      point_x = random(cell_size) + (x * cell_size);
-      point_y = random(cell_size) + (y * cell_size);
-      points.add(new Point(point_x, point_y));
+      PVector p = new PVector(
+        random(cell_size) + (position.x * cell_size),
+        random(cell_size) + (position.y * cell_size),
+        random(cell_size) + (position.z * cell_size)
+      );
+
+      points.add(new Point(p));
     }
   }
 
-  int x;
-  int y;
+  PVector position;
 
   ArrayList<Point> points;
 }
 
-class Grid {
-  Grid(int w, int h, int cell_size, int point_count) {
-    this.w = w;
-    this.h = h;
-    this.cell_size = cell_size;
-    this.num_cells_x = this.w / this.cell_size;
-    this.num_cells_y = this.h / this.cell_size;
-    this.cell_count = this.num_cells_x * this.num_cells_y;
+enum DistFunc {
+  EUCLID,
+  TAXI,
+  STAR,
+  MAX,
+  MEAN
+}
 
-    println("Generating " + cell_count + " cells. " + num_cells_x + " x " + num_cells_y);
+class Grid {
+  Grid(PVector dimensions, int cell_size, int point_count) {
+    this.dimensions = dimensions;
+    this.cell_size = cell_size;
+    this.num_cells = new PVector(
+      int(this.dimensions.x / this.cell_size),
+      int(this.dimensions.y / this.cell_size),
+      int(this.dimensions.z / this.cell_size)
+    );
+
+    int cell_count = int(this.num_cells.x * this.num_cells.y * this.num_cells.z);
+    println("Generating " + cell_count + " cells. " + this.num_cells.x + " x " + this.num_cells.y + " x " + this.num_cells.z);
     cells = new Cell[cell_count];
 
-    for (int cell_y = 0; cell_y < num_cells_y; ++cell_y) {
-      for (int cell_x = 0; cell_x < num_cells_x; ++cell_x) {
-        int index = (cell_y * num_cells_x) + cell_x;
-        cells[index] = new Cell(cell_x, cell_y, cell_size, point_count);
+    int layer_cell_count = int(this.num_cells.x * this.num_cells.y);
+    for (int cell_z = 0; cell_z < this.num_cells.z; ++cell_z) {
+      int layer_offset = cell_z * layer_cell_count;
+
+      for (int cell_y = 0; cell_y < this.num_cells.y; ++cell_y) {
+        int row_offset = cell_y * int(this.num_cells.x);
+
+        for (int cell_x = 0; cell_x < this.num_cells.x; ++cell_x) {
+          int cell_index = layer_offset + row_offset + cell_x;
+
+          PVector p = new PVector(cell_x, cell_y, cell_z);
+          cells[cell_index] = new Cell(p, cell_size, point_count);
+        }
       }
     }
   }
 
-  float[][] calcDistances(int order) {
-    int pixel_count = this.w * this.h;
+  float distance(PVector a, PVector b, DistFunc f) {
+    float d = 0;
+
+    switch (f) {
+      case EUCLID:
+        d = dist(a.x, a.y, a.z, b.x, b.y, b.z);
+        break;
+      case TAXI:
+        d = abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z);
+        break;
+      case STAR:
+        d = distance(a, b, DistFunc.EUCLID);
+        if (int(d) % 2 == 0) {
+          d /= 2;
+        } else {
+          d *= 2;
+        }
+        break;
+      case MAX:
+        d = max(abs(a.x - b.x), abs(a.y - b.y), abs(a.z - b.z));
+        break;
+      case MEAN:
+        float taxi = distance(a, b, DistFunc.TAXI);
+        float max = distance(a, b, DistFunc.MAX);
+        d = (taxi + max) / 2;
+        break;
+    }
+
+    return d;
+  }
+
+  float[][] calcDistances(int order, DistFunc df) {
+    int pixel_count = int(this.dimensions.x * this.dimensions.y * this.dimensions.z);
     float[][] distances = new float[pixel_count][order];
 
-    for (int y = 0; y < this.h; ++y) {
-      for (int x = 0; x < this.w; ++x) {
-        int index = (y * this.w) + x;
+    int layer_cell_count = int(this.dimensions.x * this.dimensions.y);
 
-        ArrayList<Point> points = this.getPoints(x, y);
+    for (int z = 0; z < this.dimensions.z; ++z) {
+      int layer_offset = z * layer_cell_count;
 
-        float[] tmp_dist = new float[points.size()];
-        for (int i = 0; i < points.size(); ++i) {
-          Point p = points.get(i);
-          float d = dist(x, y, p.x, p.y);
-          tmp_dist[i] = d;
-        }
+      for (int y = 0; y < this.dimensions.y; ++y) {
+        int row_offset  = y * int(this.dimensions.x);
 
-        float[] sorted = sort(tmp_dist);
-        distances[index] = new float[order];
-        for (int i = 0; i < order; ++i) {
-          float f = sorted[i];
-          distances[index][i] = f;
+        for (int x = 0; x < this.dimensions.x; ++x) {
+          int cell_index = layer_offset + row_offset + x;
+
+          ArrayList<Point> points = this.getPoints(new PVector(x, y, z));
+
+          float[] tmp_dist = new float[points.size()];
+          for (int i = 0; i < points.size(); ++i) {
+            Point p = points.get(i);
+            float d = distance(new PVector(x, y, z), p.position, df);
+            tmp_dist[i] = d;
+          }
+
+          float[] sorted = sort(tmp_dist);
+          for (int i = 0; i < order; ++i) {
+            float f = sorted[i];
+            distances[cell_index][i] = f;
+          }
         }
       }
     }
@@ -80,63 +135,52 @@ class Grid {
     return distances;
   }
 
-  ArrayList<Cell> getCells(int x, int y) {
-    int cell_x = int(x / this.cell_size);
-    int cell_y = int(y / this.cell_size);
+  ArrayList<Integer> getIndices(PVector pos, PVector bounds) {
+    ArrayList<Integer> indices = new ArrayList<Integer>();
+
+    int lower   = (pos.z == 0)              ? 0 : -1;
+    int upper   = (pos.z == (bounds.z - 1)) ? 0 :  1;
+    int top     = (pos.y == 0)              ? 0 : -1;
+    int bottom  = (pos.y == (bounds.y - 1)) ? 0 :  1;
+    int left    = (pos.x == 0)              ? 0 : -1;
+    int right   = (pos.x == (bounds.x - 1)) ? 0 :  1;
+
+    int layer_cell_count = int(bounds.x * bounds.y);
+
+    for (int k = lower; k <= upper; ++k) {
+      int layer_offset = (int(pos.z) + k) * layer_cell_count;
+
+      for (int j = top; j <= bottom; ++j) {
+        int row_offset = (int(pos.y) + j) * int(bounds.x);
+
+        for (int i = left; i <= right; ++i) {
+          indices.add(layer_offset + row_offset + int(pos.x + i));
+        }
+      }
+    }
+
+    return indices;
+  }
+
+  ArrayList<Cell> getCells(PVector pos) {
+    PVector cell_pos = new PVector(
+      int(pos.x / this.cell_size),
+      int(pos.y / this.cell_size),
+      int(pos.z / this.cell_size)
+    );
+
+    ArrayList<Integer> indices = getIndices(cell_pos, this.num_cells);
 
     ArrayList<Cell> neighbours = new ArrayList<Cell>();
-
-    int index;
-    index = (cell_y * this.num_cells_x) + cell_x;
-    neighbours.add(this.cells[index]);
-
-    boolean is_top = (cell_y == 0);
-    boolean is_bottom = (cell_y == (num_cells_y - 1));
-    boolean is_left = (cell_x == 0);
-    boolean is_right = (cell_x == (num_cells_x - 1));
-
-    if (!is_top) {
-      index = ((cell_y - 1) * this.num_cells_x) + (cell_x);
-      neighbours.add(this.cells[index]);
-
-      if (!is_left) {
-        index = ((cell_y - 1) * this.num_cells_x) + (cell_x - 1);
-        neighbours.add(this.cells[index]);
-      }
-      if (!is_right) {
-        index = ((cell_y - 1) * this.num_cells_x) + (cell_x + 1);
-        neighbours.add(this.cells[index]);
-      }
-    }
-
-    if (!is_left) {
-      index = ((cell_y) * this.num_cells_x) + (cell_x - 1);
-      neighbours.add(this.cells[index]);
-    }
-    if (!is_right) {
-      index = ((cell_y) * this.num_cells_x) + (cell_x + 1);
-      neighbours.add(this.cells[index]);
-    }
-
-    if (!is_bottom) {
-      index = ((cell_y + 1) * this.num_cells_x) + (cell_x);
-      neighbours.add(this.cells[index]);
-
-      if (!is_left) {
-        index = ((cell_y + 1) * this.num_cells_x) + (cell_x - 1);
-        neighbours.add(this.cells[index]);
-      }
-      if (!is_right) {
-        index = ((cell_y + 1) * this.num_cells_x) + (cell_x + 1);
-        neighbours.add(this.cells[index]);
-      }
+    for (int i : indices) {
+      neighbours.add(this.cells[i]);
     }
 
     return neighbours;
   }
 
-  ArrayList<Point> getPoints(int x, int y) {
-    ArrayList<Cell> neighbours = this.getCells(x, y);
+  ArrayList<Point> getPoints(PVector pos) {
+    ArrayList<Cell> neighbours = this.getCells(pos);
     ArrayList<Point> points = new ArrayList<Point>();
 
     for (int i = 0; i < neighbours.size(); ++i) {
@@ -147,12 +191,8 @@ class Grid {
     return points;
   }
 
-  int w;
-  int h;
+  PVector dimensions;
+  PVector num_cells;
   int cell_size;
-  int num_cells_x;
-  int num_cells_y;
-  int cell_count;
-
   Cell[] cells;
 }
